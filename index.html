@@ -1,0 +1,344 @@
+<!-- Full HTML content is too long for one message. Let me break it into parts. -->
+
+<!-- PART 1: HEAD + STYLES -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CCU Calculator</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      color: #333;
+      font-size: 17px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h2, h3, h4 {
+      color: #2c3e50;
+    }
+
+    label {
+      font-weight: 500;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    input, select {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    .section {
+      background: #fff;
+      padding: 1rem;
+      margin-top: 1.5rem;
+      border-radius: 8px;
+      border-left: 5px solid #2980b9;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .environment {
+      margin-top: 2rem;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .field-group {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .node-type {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .checkmark {
+      font-size: 24px;
+      color: green;
+      visibility: hidden;
+      width: 30px;
+    }
+
+    .node-type.valid .checkmark {
+      visibility: visible;
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      font-size: 17px;
+      margin-top: 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    .results {
+      background: #ecf0f1;
+      padding: 1rem;
+      margin-top: 2rem;
+      border-radius: 6px;
+      display: none;
+    }
+
+    .result-section {
+      background-color: #fff;
+      padding: 1rem;
+      border-radius: 6px;
+      margin-top: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .result-line {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .bold {
+      font-weight: bold;
+    }
+
+    .note {
+      color: #c0392b;
+      font-style: italic;
+      margin-top: 5px;
+    }
+
+    @media (max-width: 768px) {
+      .row, .node-type, .result-line {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>Multi-Environment CCU Calculator</h2>
+  <label for="envCount">How many environments do you want to quote? (e.g. 3 for dev, test, prod)</label>
+  <input type="number" id="envCount" min="1" value="1">
+  <button onclick="generateEnvironments()">Next</button>
+
+  <form id="ccuForm" style="display:none;" onsubmit="event.preventDefault(); calculateCCUs();">
+    <div id="environmentsContainer"></div>
+    <button type="submit">Calculate All</button>
+  </form>
+
+  <div id="results" class="results">
+    <h3>Results</h3>
+    <div id="resultDetails"></div>
+  </div>
+</div>
+
+<script>
+  function generateEnvironments() {
+    const container = document.getElementById('environmentsContainer');
+    container.innerHTML = '';
+    document.getElementById('results').style.display = 'none';
+
+    const count = parseInt(document.getElementById('envCount').value);
+    if (count < 1) return;
+
+    document.getElementById('ccuForm').style.display = 'block';
+
+    for (let i = 0; i < count; i++) {
+      const section = document.createElement('div');
+      section.classList.add('section', 'environment');
+      section.setAttribute('id', `env${i}`);
+
+      section.innerHTML = `
+        <h3>Environment ${i + 1}</h3>
+        <div class="row">
+          <div class="field-group">
+            <label for="envName${i}">Environment Name</label>
+            <input type="text" id="envName${i}" placeholder="e.g. dev, test, prod" required>
+          </div>
+          <div class="field-group">
+            <label for="support${i}">Support Level</label>
+            <select id="support${i}">
+              <option value="standard">Standard</option>
+              <option value="business">Business</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="nodeTypeCount${i}"># of Node Types</label>
+            <input type="number" id="nodeTypeCount${i}" value="1" min="1" onchange="generateNodeInputs(${i})">
+          </div>
+        </div>
+        <div id="nodeContainer${i}"></div>
+      `;
+
+      container.appendChild(section);
+      generateNodeInputs(i);
+    }
+  }
+
+  function generateNodeInputs(envIndex) {
+    const container = document.getElementById(`nodeContainer${envIndex}`);
+    container.innerHTML = '';
+    const count = parseInt(document.getElementById(`nodeTypeCount${envIndex}`).value);
+
+    for (let i = 0; i < count; i++) {
+      const div = document.createElement('div');
+      div.classList.add('node-type');
+      div.setAttribute('id', `env${envIndex}node${i}`);
+
+      div.innerHTML = `
+        <div class="checkmark" id="check${envIndex}_${i}">✅</div>
+        <div class="field-group">
+          <label>Node Type</label>
+          <input type="text" id="name${envIndex}_${i}" placeholder="e.g. gateway, worker, master" oninput="validateRow(${envIndex},${i})">
+        </div>
+        <div class="field-group">
+          <label># Nodes</label>
+          <input type="number" id="count${envIndex}_${i}" value="1" min="1" oninput="validateRow(${envIndex},${i})">
+        </div>
+        <div class="field-group">
+          <label>Cores</label>
+          <input type="number" id="cores${envIndex}_${i}" value="32" min="1" oninput="validateRow(${envIndex},${i})">
+        </div>
+        <div class="field-group">
+          <label>RAM (GB)</label>
+          <input type="number" step="0.01" id="ram${envIndex}_${i}" value="128" min="0" oninput="validateRow(${envIndex},${i})">
+        </div>
+        <div class="field-group">
+          <label>Disk (TB)</label>
+          <input type="number" step="0.01" id="disk${envIndex}_${i}" value="0.5" min="0" oninput="validateRow(${envIndex},${i})">
+        </div>
+      `;
+      container.appendChild(div);
+      validateRow(envIndex, i);
+    }
+  }
+
+  function validateRow(env, i) {
+    const name = document.getElementById(`name${env}_${i}`).value.trim();
+    const count = parseInt(document.getElementById(`count${env}_${i}`).value);
+    const cores = parseInt(document.getElementById(`cores${env}_${i}`).value);
+    const ram = parseFloat(document.getElementById(`ram${env}_${i}`).value);
+
+    const isValid = name && count > 0 && cores > 0 && ram >= 0;
+    const row = document.getElementById(`env${env}node${i}`);
+    if (isValid) {
+      row.classList.add('valid');
+    } else {
+      row.classList.remove('valid');
+    }
+  }
+
+  function calculateCCUs() {
+    const envCount = parseInt(document.getElementById('envCount').value);
+    let resultHTML = '';
+    let grandTotal = 0;
+
+    for (let e = 0; e < envCount; e++) {
+      const envName = document.getElementById(`envName${e}`).value || `Environment ${e+1}`;
+      const support = document.getElementById(`support${e}`).value;
+      const nodeCount = parseInt(document.getElementById(`nodeTypeCount${e}`).value);
+
+      let totalCores = 0;
+      let totalRAM = 0;
+      let totalDisk = 0;
+      let totalNodes = 0;
+
+      for (let n = 0; n < nodeCount; n++) {
+        const nodes = parseInt(document.getElementById(`count${e}_${n}`).value) || 0;
+        const cores = parseInt(document.getElementById(`cores${e}_${n}`).value) || 0;
+        const ram = parseFloat(document.getElementById(`ram${e}_${n}`).value) || 0;
+        const disk = parseFloat(document.getElementById(`disk${e}_${n}`).value) || 0;
+
+        totalNodes += nodes;
+        totalCores += nodes * cores;
+        totalRAM += nodes * ram;
+        totalDisk += nodes * disk;
+      }
+
+      const pricePerCCU = support === 'business' ? 450 : 360;
+      const diskPricePerTB = support === 'business' ? 100 : 80;
+
+      // Actual values
+      const actualCCU = Math.round(totalCores / 6 + totalRAM / 12);
+      const actualDisk = totalDisk;
+
+      // Apply minimums
+      const minCCU = totalNodes * 16;
+      const minDUM = totalNodes * 20;
+
+      const usedCCU = Math.max(actualCCU, minCCU);
+      const usedDisk = Math.max(actualDisk, minDUM);
+
+      const ccusNote = actualCCU < minCCU ? `<div class="note">Minimum CCU applied: 16 per node × ${totalNodes} = ${minCCU}</div>` : '';
+      const diskNote = actualDisk < minDUM ? `<div class="note">Minimum DUM applied: 20 TB per node × ${totalNodes} = ${minDUM} TB</div>` : '';
+
+      const diskCost = usedDisk * diskPricePerTB;
+      const totalPrice = usedCCU * pricePerCCU + diskCost;
+
+      grandTotal += totalPrice;
+
+      resultHTML += `
+        <div class="result-section">
+          <h4>${envName} (${support.charAt(0).toUpperCase() + support.slice(1)} Support)</h4>
+          <div class="result-line">
+            <div>CCUs: ${actualCCU} ($${pricePerCCU} per CCU)</div>
+            <div>DUM: ${actualDisk.toFixed(2)} TB ($${diskPricePerTB} per TB)</div>
+          </div>
+          ${ccusNote}
+          ${diskNote}
+          <div class="result-line bold">
+            <div>Applied CCUs: ${usedCCU}</div>
+            <div>Applied DUM: ${usedDisk.toFixed(2)} TB</div>
+          </div>
+          <div class="result-line bold">
+            <div>Total Price:</div>
+            <div>$${totalPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    resultHTML += `
+      <div class="result-section bold" style="border-left: 5px solid #27ae60;">
+        <div class="result-line">
+          <div>Grand Total:</div>
+          <div>$${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('resultDetails').innerHTML = resultHTML;
+    document.getElementById('results').style.display = 'block';
+  }
+
+  window.onload = () => generateEnvironments();
+</script>
+</body>
+</html>
